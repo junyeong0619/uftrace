@@ -1384,6 +1384,39 @@ static void dump_mermaid_header(struct uftrace_dump_ops *ops, struct uftrace_dat
 	pr_out("<body>\n");
 }
 
+static char *escape_mermaid_label(const char *name)
+{
+	const char *p;
+	char *escaped, *q;
+	int extra = 0;
+
+	for (p = name; *p; p++) {
+		if (*p == '<' || *p == '>')
+			extra += 3; /* "&lt;" or "&gt;" is 4 chars vs 1 */
+	}
+
+	if (extra == 0)
+		return (char *)name;
+
+	escaped = xmalloc(strlen(name) + extra + 1);
+	q = escaped;
+	for (p = name; *p; p++) {
+		if (*p == '<') {
+			memcpy(q, "&lt;", 4);
+			q += 4;
+		}
+		else if (*p == '>') {
+			memcpy(q, "&gt;", 4);
+			q += 4;
+		}
+		else {
+			*q++ = *p;
+		}
+	}
+	*q = '\0';
+	return escaped;
+}
+
 static void print_graph_node_mermaid(struct uftrace_graph *graph, struct uftrace_graph_node *node)
 {
 	char *symname = node->name;
@@ -1391,8 +1424,17 @@ static void print_graph_node_mermaid(struct uftrace_graph *graph, struct uftrace
 	static int depth = -1;
 	depth++;
 	list_for_each_entry(child, &node->head, list) {
-		pr_out("  %d_%d[\"%s\"] -->|%d| %d_%d[\"%s\"];\n", depth, node->id, symname,
-		       child->nr_calls, depth + 1, child->id, child->name);
+		char *escaped_node = escape_mermaid_label(symname);
+		char *escaped_child = escape_mermaid_label(child->name);
+
+		pr_out("  %d_%d[\"%s\"] -->|%d| %d_%d[\"%s\"];\n", depth, node->id, escaped_node,
+		       child->nr_calls, depth + 1, child->id, escaped_child);
+
+		if (escaped_node != symname)
+			free(escaped_node);
+		if (escaped_child != child->name)
+			free(escaped_child);
+
 		print_graph_node_mermaid(graph, child);
 	}
 	if (list_no_entry(child, &node->head, list)) {
@@ -1429,7 +1471,7 @@ static void dump_mermaid_footer(struct uftrace_dump_ops *ops, struct uftrace_dat
 	pr_out("var config = {\n");
 	pr_out("	startOnLoad: true,\n");
 	pr_out("	maxTextSize: 99999999,\n");
-	pr_out("	flowchart: { useMaxWidth: false, curve : \'basis\', htmlLabels: \'false\'},\n");
+	pr_out("	flowchart: { useMaxWidth: false, curve : \'basis\', htmlLabels: false},\n");
 	pr_out("	securityLevel:\'loose\'\n");
 	pr_out("};\n");
 	pr_out("mermaid.initialize(config);\n");
