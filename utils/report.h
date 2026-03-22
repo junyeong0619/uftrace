@@ -33,6 +33,7 @@ struct uftrace_report_node {
 	struct report_time_stat self;
 	struct uftrace_dbg_loc *loc;
 	uint64_t call;
+	uint64_t cpu_mask;
 	struct rb_node name_link;
 	struct rb_node sort_link;
 	unsigned size;

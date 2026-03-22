@@ -142,6 +142,8 @@ void report_update_node(struct uftrace_report_node *node, struct uftrace_task_re
 	node->loc = loc;
 	if (task->func != NULL)
 		node->size = task->func->size;
+	if (task->current_cpu >= 0 && task->current_cpu < (int)(sizeof(node->cpu_mask) * 8))
+		node->cpu_mask |= (1ULL << task->current_cpu);
 }
 
 void report_calc_avg(struct rb_root *root)
@@ -978,6 +980,28 @@ FIELD_TIME(REPORT_F_TASK_TOTAL_TIME, total, total.sum, task_total, "Total time")
 FIELD_TIME(REPORT_F_TASK_SELF_TIME, self, self.sum, task_self, "Self time");
 FIELD_TID(REPORT_F_TASK_TID, tid, task_tid, "TID");
 FIELD_UINT(REPORT_F_TASK_NR_FUNC, func, call, task_nr_func, "Num funcs");
+
+static void print_cpu(struct field_data *fd)
+{
+	struct uftrace_report_node *node = fd->arg;
+	uint64_t mask = node->cpu_mask;
+	bool first = true;
+	int i;
+
+	if (mask == 0) {
+		pr_out("%5s", "-");
+		return;
+	}
+
+	pr_out(" ");
+	for (i = 0; i < (int)(sizeof(mask) * 8); i++) {
+		if (mask & (1ULL << i)) {
+			pr_out("%s%d", first ? "" : ",", i);
+			first = false;
+		}
+	}
+}
+FIELD_STRUCT(REPORT_F_CPU, cpu, cpu, "  CPU", 5);
 /* clang-format on */
 
 /* index of this table should be matched to display_field_id */
@@ -986,6 +1010,7 @@ static struct display_field *field_table[] = {
 	&field_self,	     &field_self_avg,	  &field_self_min,    &field_self_max,
 	&field_call,	     &field_size,	  &field_total_stdv,  &field_self_stdv,
 	&field_total_min_ts, &field_total_max_ts, &field_self_min_ts, &field_self_max_ts,
+	&field_cpu,
 };
 
 /* index of this table should be matched to display_field_id */
